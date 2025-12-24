@@ -1,14 +1,34 @@
+/********************
+ DATE RANGE
+********************/
 const startDate = new Date(2025, 11); // Dec 2025
 const endDate   = new Date(2026, 3);  // April 2026
 let currentDate = new Date(startDate);
 
-let attendanceData = {};
+/********************
+ LOCAL STORAGE
+********************/
+const STORAGE_KEY = "attendance_data_v1";
+
+let attendanceData =
+  JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+
 let selectedKey = null;
 
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(attendanceData));
+}
+
+/********************
+ UTIL
+********************/
 function daysInMonth(y, m) {
   return new Date(y, m + 1, 0).getDate();
 }
 
+/********************
+ RENDER CALENDAR
+********************/
 function renderCalendar() {
   const cal = document.getElementById("calendar");
   cal.innerHTML = "";
@@ -19,18 +39,21 @@ function renderCalendar() {
   document.getElementById("monthLabel").textContent =
     currentDate.toLocaleString("default", { month: "long", year: "numeric" });
 
-  const first = new Date(y, m, 1).getDay();
+  const firstDay = new Date(y, m, 1).getDay();
 
-  for (let i = 0; i < first; i++) {
+  // Empty cells before first weekday
+  for (let i = 0; i < firstDay; i++) {
     const e = document.createElement("div");
     e.className = "day empty";
     cal.appendChild(e);
   }
 
+  // Render actual days
   for (let d = 1; d <= daysInMonth(y, m); d++) {
     const date = new Date(y, m, d);
     const key = `${y}-${m + 1}-${d}`;
 
+    // Sundays auto-holiday
     if (date.getDay() === 0 && !attendanceData[key]) {
       attendanceData[key] = "holiday";
     }
@@ -39,14 +62,19 @@ function renderCalendar() {
     cell.className = `day ${attendanceData[key] || ""}`;
     cell.textContent = d;
     cell.onclick = () => openModal(key, date);
+
     cal.appendChild(cell);
   }
 
+  saveData();
   calculateMonth();
 }
 
+/********************
+ MODAL LOGIC
+********************/
 function openModal(key, date) {
-  if (date.getDay() === 0) return;
+  if (date.getDay() === 0) return; // lock Sundays
   selectedKey = key;
   document.getElementById("statusModal").classList.remove("hidden");
 }
@@ -58,16 +86,21 @@ function closeModal() {
 
 function setStatus(status) {
   attendanceData[selectedKey] = status;
+  saveData();
   closeModal();
   renderCalendar();
 }
 
 function clearDate() {
   delete attendanceData[selectedKey];
+  saveData();
   closeModal();
   renderCalendar();
 }
 
+/********************
+ NAVIGATION
+********************/
 function nextMonth() {
   const n = new Date(currentDate);
   n.setMonth(n.getMonth() + 1);
@@ -86,12 +119,18 @@ function prevMonth() {
   }
 }
 
+/********************
+ MONTH CALCULATION
+********************/
 function calculateMonth() {
   const y = currentDate.getFullYear();
   const m = currentDate.getMonth();
   const total = daysInMonth(y, m);
 
-  let present = 0, absent = 0, holiday = 0, undecided = 0;
+  let present = 0;
+  let absent = 0;
+  let holiday = 0;
+  let undecided = 0;
 
   for (let d = 1; d <= total; d++) {
     const date = new Date(y, m, d);
@@ -116,14 +155,20 @@ function calculateMonth() {
   recommendLeaves(present, working, undecided);
 }
 
+/********************
+ RECOMMENDATION SYSTEM
+********************/
 function recommendLeaves(present, working, remaining) {
-  const target = Number(document.getElementById("target").value) / 100;
+  const target =
+    Number(document.getElementById("target").value) / 100;
+
   const advice = document.getElementById("advice");
   const planner = document.getElementById("planner");
 
   const maxWorking = working + remaining;
   const requiredPresent = Math.ceil(target * maxWorking);
-  const leavesAllowed = maxWorking - requiredPresent - (working - present);
+  const leavesAllowed =
+    maxWorking - requiredPresent - (working - present);
 
   if (leavesAllowed >= 0) {
     advice.textContent = "Target achievable this month";
@@ -138,4 +183,7 @@ function recommendLeaves(present, working, remaining) {
   }
 }
 
+/********************
+ INIT
+********************/
 renderCalendar();
