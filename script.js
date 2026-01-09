@@ -1,15 +1,8 @@
-/********************
- DATE RANGE
-********************/
-const startDate = new Date(2025, 11); // Dec 2025
-const endDate   = new Date(2026, 3);  // April 2026
+const startDate = new Date(2025, 11);
+const endDate   = new Date(2026, 3); 
 let currentDate = new Date(startDate);
 
-/********************
- LOCAL STORAGE
-********************/
-const STORAGE_KEY = "attendance_data_v1";
-
+const STORAGE_KEY = "attendance_data_v2";
 let attendanceData =
   JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
 
@@ -19,16 +12,10 @@ function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(attendanceData));
 }
 
-/********************
- UTIL
-********************/
 function daysInMonth(y, m) {
   return new Date(y, m + 1, 0).getDate();
 }
 
-/********************
- RENDER CALENDAR
-********************/
 function renderCalendar() {
   const cal = document.getElementById("calendar");
   cal.innerHTML = "";
@@ -41,19 +28,16 @@ function renderCalendar() {
 
   const firstDay = new Date(y, m, 1).getDay();
 
-  // Empty cells before first weekday
   for (let i = 0; i < firstDay; i++) {
     const e = document.createElement("div");
     e.className = "day empty";
     cal.appendChild(e);
   }
 
-  // Render actual days
   for (let d = 1; d <= daysInMonth(y, m); d++) {
     const date = new Date(y, m, d);
     const key = `${y}-${m + 1}-${d}`;
 
-    // Sundays auto-holiday
     if (date.getDay() === 0 && !attendanceData[key]) {
       attendanceData[key] = "holiday";
     }
@@ -67,14 +51,11 @@ function renderCalendar() {
   }
 
   saveData();
-  calculateMonth();
+  calculateGlobal();
 }
 
-/********************
- MODAL LOGIC
-********************/
 function openModal(key, date) {
-  if (date.getDay() === 0) return; // lock Sundays
+  if (date.getDay() === 0) return;
   selectedKey = key;
   document.getElementById("statusModal").classList.remove("hidden");
 }
@@ -98,9 +79,6 @@ function clearDate() {
   renderCalendar();
 }
 
-/********************
- NAVIGATION
-********************/
 function nextMonth() {
   const n = new Date(currentDate);
   n.setMonth(n.getMonth() + 1);
@@ -119,49 +97,36 @@ function prevMonth() {
   }
 }
 
-/********************
- MONTH CALCULATION
-********************/
-function calculateMonth() {
-  const y = currentDate.getFullYear();
-  const m = currentDate.getMonth();
-  const total = daysInMonth(y, m);
+function calculateGlobal() {
+  let present = 0, absent = 0, holiday = 0, remaining = 0;
 
-  let present = 0;
-  let absent = 0;
-  let holiday = 0;
-  let undecided = 0;
-
-  for (let d = 1; d <= total; d++) {
-    const date = new Date(y, m, d);
-    const key = `${y}-${m + 1}-${d}`;
+  const d = new Date(startDate);
+  while (d <= endDate) {
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     const status = attendanceData[key];
 
-    if (date.getDay() === 0 || status === "holiday") holiday++;
+    if (d.getDay() === 0 || status === "holiday") holiday++;
     else if (status === "present") present++;
     else if (status === "absent") absent++;
-    else undecided++;
+    else remaining++;
+
+    d.setDate(d.getDate() + 1);
   }
 
   const working = present + absent;
-  const percentage = working === 0 ? 0 : (present / working) * 100;
+  const percent = working === 0 ? 0 : (present / working) * 100;
 
   document.getElementById("present").textContent = present;
   document.getElementById("absent").textContent = absent;
   document.getElementById("holiday").textContent = holiday;
   document.getElementById("percentage").textContent =
-    percentage.toFixed(2) + "%";
+    percent.toFixed(2) + "%";
 
-  recommendLeaves(present, working, undecided);
+  recommendGlobal(present, working, remaining);
 }
 
-/********************
- RECOMMENDATION SYSTEM
-********************/
-function recommendLeaves(present, working, remaining) {
-  const target =
-    Number(document.getElementById("target").value) / 100;
-
+function recommendGlobal(present, working, remaining) {
+  const target = Number(document.getElementById("target").value) / 100;
   const advice = document.getElementById("advice");
   const planner = document.getElementById("planner");
 
@@ -171,19 +136,16 @@ function recommendLeaves(present, working, remaining) {
     maxWorking - requiredPresent - (working - present);
 
   if (leavesAllowed >= 0) {
-    advice.textContent = "Target achievable this month";
+    advice.textContent = "Target achievable for the semester";
     advice.style.color = "#22c55e";
     planner.innerHTML =
-      `You can take <b>${leavesAllowed}</b> more leave(s).`;
+      `You can take <b>${leavesAllowed}</b> more leave(s) till April 2026.`;
   } else {
-    advice.textContent = "Target not achievable this month";
+    advice.textContent = "Target not achievable for the semester";
     advice.style.color = "#ef4444";
     planner.textContent =
       "No more leaves possible for this target.";
   }
 }
 
-/********************
- INIT
-********************/
 renderCalendar();
